@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String             @id @default(uuid())
+  name          String
+  email         String             @unique
+  passwordHash  String
+  role          String             @default("STUDENT") // STUDENT | ADMIN
+  photoUrl      String?
+  isBlocked     Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  enrollments   Enrollment[]
+  progress      LessonProgress[]
+  transactions  Transaction[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  courses     Course[]
+}
+
+model Course {
+  id           String        @id @default(uuid())
+  title        String
+  slug         String        @unique
+  description  String
+  price        Float         @default(0.0)
+  isFree       Boolean       @default(false)
+  isPublished  Boolean       @default(false)
+  thumbnailUrl String?
+  categoryId   String?
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  sections     Section[]
+  enrollments  Enrollment[]
+  transactions Transaction[]
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  title     String
+  order     Int      @default(0)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons   Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lesson {
+  id              String           @id @default(uuid())
+  title           String
+  order           Int              @default(0)
+  type            String           @default("VIDEO") // VIDEO | PDF | ARTICLE
+  contentUrl      String?          // Video URL or PDF URL
+  contentText     String?          // Article / lesson body
+  durationMinutes Int              @default(10)
+  sectionId       String
+  section         Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  progress        LessonProgress[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Enrollment {
+  id                   String   @id @default(uuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId             String
+  course               Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  completionPercentage Float    @default(0.0)
+  enrolledAt           DateTime @default(now())
+  lastAccessedAt       DateTime @default(now())
+
+  @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, lessonId])
+}
+
+model Transaction {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId   String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  amount     Float
+  currency   String   @default("USD")
+  status     String   @default("SUCCESS") // SUCCESS | FAILED | PENDING
+  gateway    String   @default("MOCK")    // MOCK | STRIPE
+  gatewayRef String?
+  createdAt  DateTime @default(now())
+}
+
+model PaymentSetting {
+  id              String   @id @default("default")
+  activeGateway   String   @default("MOCK")
+  testMode        Boolean  @default(true)
+  stripePublicKey String?
+  stripeSecretKey String?
+  updatedAt       DateTime @updatedAt
+}
+
+model SiteSetting {
+  id               String   @id @default("default")
+  siteName         String   @default("LearnSphere LMS")
+  logoUrl          String?
+  contactEmail     String   @default("support@learnsphere.com")
+  currency         String   @default("USD")
+  termsText        String   @default("Terms of Service content...")
+  refundPolicyText String   @default("Refund Policy content...")
+  updatedAt        DateTime @updatedAt
+}
+
+model EmailNotification {
+  id        String   @id @default(uuid())
+  toEmail   String
+  subject   String
+  body      String
+  type      String   // PURCHASE_CONFIRMATION | PASSWORD_RESET | ENROLLMENT
+  sentAt    DateTime @default(now())
+}
